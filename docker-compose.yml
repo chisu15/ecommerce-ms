@@ -1,0 +1,103 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: ms_postgres
+    environment:
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/initdb:/docker-entrypoint-initdb.d
+
+  redis:
+    image: redis:7
+    container_name: ms_redis
+    ports:
+      - "6379:6379"
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: gateway
+    container_name: gateway
+    env_file: .env
+    environment:
+      PORT: 3000
+      USER_BASE_URL: ${USER_BASE_URL}
+      PRODUCT_BASE_URL: ${PRODUCT_BASE_URL}
+      ORDER_BASE_URL: ${ORDER_BASE_URL}
+    depends_on:
+      - redis
+      - user-service
+      - product-service
+      - order-service
+    ports:
+      - "3000:3000"
+
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: user
+    container_name: user-service
+    env_file: .env
+    environment:
+      PORT: 3000
+      DB_NAME: ${USER_DB}
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "3001:3000"
+
+  product-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: product
+    container_name: product-service
+    env_file: .env
+    environment:
+      PORT: 3000
+      DB_NAME: ${PRODUCT_DB}
+      STREAM_OUTBOX_TARGET: ${STREAM_PRODUCT_EVENTS}
+      STREAM_CONSUME: ${STREAM_ORDER_EVENTS}
+      CONSUMER_GROUP: ${GROUP_PRODUCT}
+      CONSUMER_NAME: product-1
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "3002:3000"
+
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: order
+    container_name: order-service
+    env_file: .env
+    environment:
+      PORT: 3000
+      DB_NAME: ${ORDER_DB}
+      STREAM_OUTBOX_TARGET: ${STREAM_ORDER_EVENTS}
+      STREAM_CONSUME: ${STREAM_PRODUCT_EVENTS}
+      CONSUMER_GROUP: ${GROUP_ORDER}
+      CONSUMER_NAME: order-1
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "3003:3000"
+
+volumes:
+  pgdata:
