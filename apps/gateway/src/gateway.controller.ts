@@ -1,5 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
-import { GatewayService } from './gateway.service';
+import { Controller, Get } from '@nestjs/common'
+import { GatewayService } from './gateway.service'
 
 @Controller()
 export class GatewayController {
@@ -7,6 +7,6 @@ export class GatewayController {
 
   @Get()
   getHello(): string {
-    return this.gatewayService.getHello();
+    return this.gatewayService.getHello()
   }
 }

@@ -1,5 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
-import { ProductService } from './product.service';
+import { Controller, Get } from '@nestjs/common'
+import { ProductService } from './product.service'
 
 @Controller()
 export class ProductController {
@@ -7,6 +7,6 @@ export class ProductController {
 
   @Get()
   getHello(): string {
-    return this.productService.getHello();
+    return this.productService.getHello()
   }
 }
