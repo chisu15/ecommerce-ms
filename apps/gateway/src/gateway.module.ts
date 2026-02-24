@@ -1,40 +1,33 @@
 import { Module } from '@nestjs/common'
-import { GatewayController } from './gateway.controller'
-import { GatewayService } from './gateway.service'
+import { ConfigModule } from '@nestjs/config'
+import { APP_GUARD } from '@nestjs/core'
+
+import { AuthModule } from './auth/auth.module'
+import { AccessTokenGuard } from './auth/guards/access-token.guard'
 import { ProxyModule } from './proxy/proxy.module'
-import { UsersController } from './users/users.controller'
+
+import { HealthController } from './health/health.controller'
 import { ProductsController } from './products/products.controller'
 import { OrdersController } from './orders/orders.controller'
-import { HealthController } from './health/health.controller'
-import { ConfigModule } from '@nestjs/config'
-import { TypeOrmModule } from '@nestjs/typeorm'
+import { UsersController } from './users/users.controller'
+import { AuthController } from './auth/auth.controller'
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['apps/product/.env'],
-    }),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT || 5432),
-      username: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      autoLoadEntities: true,
-      synchronize: true,
+      envFilePath: 'apps/gateway/.env',
     }),
     ProxyModule,
+    AuthModule,
   ],
-
   controllers: [
-    GatewayController,
-    UsersController,
+    HealthController,
+    AuthController,
     ProductsController,
     OrdersController,
-    HealthController,
+    UsersController,
   ],
-  providers: [GatewayService],
+  providers: [{ provide: APP_GUARD, useClass: AccessTokenGuard }],
 })
 export class GatewayModule {}

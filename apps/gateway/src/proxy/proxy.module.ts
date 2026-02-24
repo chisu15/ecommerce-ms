@@ -3,5 +3,6 @@ import { HttpClientService } from './http-client/http-client.service'
 
 @Module({
   providers: [HttpClientService],
+  exports: [HttpClientService],
 })
 export class ProxyModule {}

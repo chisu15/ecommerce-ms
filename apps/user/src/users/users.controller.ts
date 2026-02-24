@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common'
 import { UsersService } from './users.service'
+import { ListUsersDto } from './dto/list-user.dto'
 
 @Controller('users')
 export class UsersController {
@@ -10,13 +11,13 @@ export class UsersController {
     return this.users.create(body)
   }
 
+  @Get()
+  list(@Query() q: ListUsersDto) {
+    return this.users.list(q)
+  }
+
   @Get(':id')
   get(@Param('id') id: string) {
     return this.users.findById(id)
-  }
-
-  @Get('by-phone/:phone')
-  getByPhone(@Param('phone') phone: string) {
-    return this.users.findByPhone(phone)
   }
 }

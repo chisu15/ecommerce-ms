@@ -11,6 +11,32 @@ export class ProductsService {
     return this.repo.save(this.repo.create(data))
   }
 
+  async list(filter: {
+    sku?: string
+    name?: string
+    page?: number
+    limit?: number
+  }) {
+    const page = Math.max(1, Number(filter.page || 1))
+    const limit = Math.min(100, Math.max(1, Number(filter.limit || 10)))
+    const skip = (page - 1) * limit
+
+    // sku = exact match (trả 1 item cũng ok, nhưng mình vẫn trả pagination đồng bộ)
+    const qb = this.repo.createQueryBuilder('p')
+
+    if (filter.sku) qb.andWhere('p.sku = :sku', { sku: filter.sku })
+    if (filter.name) qb.andWhere('p.name ILIKE :q', { q: `%${filter.name}%` })
+
+    qb.orderBy('p.createdAt', 'DESC').skip(skip).take(limit)
+
+    const [data, total] = await qb.getManyAndCount()
+
+    return {
+      data,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    }
+  }
+
   async findById(id: string) {
     const p = await this.repo.findOne({ where: { id } })
     if (!p) throw new NotFoundException('Product not found')

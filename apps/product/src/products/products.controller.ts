@@ -11,6 +11,7 @@ import {
 import { ProductsService } from './products.service'
 import { CreateProductDto } from './dto/create-product.dto'
 import { UpdateProductDto } from './dto/update-product.dto'
+import { ListProductsDto } from './dto/list-product.dto'
 
 @Controller('products')
 export class ProductsController {
@@ -26,12 +27,10 @@ export class ProductsController {
     return this.products.findById(id)
   }
 
-  // GET /products?sku=... | ?name=...
+  // GET /products?sku=xxx&name=yyy&page=1&limit=20
   @Get()
-  list(@Query('sku') sku?: string, @Query('name') name?: string) {
-    if (sku) return this.products.findBySku(sku)
-    if (name) return this.products.searchByName(name)
-    return []
+  list(@Query() q: ListProductsDto) {
+    return this.products.list(q)
   }
 
   @Patch(':id')
