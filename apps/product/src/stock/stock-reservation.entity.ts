@@ -6,18 +6,24 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm'
 
+type ReservationItem = { productId: string; qty: number }
+type ReservationStatus = 'RESERVED'
+
 @Entity('stock_reservations')
-@Index(['orderId'], { unique: true }) // idempotency key
+@Index(['orderId'], { unique: true })
 export class StockReservation {
   @PrimaryGeneratedColumn('uuid')
   id!: string
 
-  @Column({ name: 'order_id', type: 'uuid' })
+  @Column({ type: 'uuid' })
   orderId!: string
 
   @Column({ type: 'jsonb' })
-  items!: Array<{ productId: string; qty: number }>
+  items!: ReservationItem[]
 
-  @CreateDateColumn({ name: 'created_at' })
+  @Column({ type: 'varchar', default: 'RESERVED' })
+  status!: ReservationStatus
+
+  @CreateDateColumn({ name: 'createdAt' })
   createdAt!: Date
 }

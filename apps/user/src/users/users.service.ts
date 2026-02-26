@@ -60,29 +60,14 @@ export class UsersService {
       phone: data.phone,
       name: data.name,
       passwordHash: passwordHash,
-      refreshTokenHash: null,
     })
     return this.repo.save(user)
-  }
-
-  async setRefreshTokenHash(userId: string, refreshToken: string | null) {
-    const refreshTokenHash = refreshToken
-      ? await bcrypt.hash(refreshToken, 10)
-      : null
-    await this.repo.update({ id: userId }, { refreshTokenHash })
   }
 
   async validatePassword(phone: string, password: string) {
     const user = await this.findByPhone(phone)
     if (!user) return null
     const ok = await bcrypt.compare(password, user.passwordHash)
-    return ok ? user : null
-  }
-
-  async validateRefreshToken(userId: string, refreshToken: string) {
-    const user = await this.repo.findOne({ where: { id: userId } })
-    if (!user || !user.refreshTokenHash) return null
-    const ok = await bcrypt.compare(refreshToken, user.refreshTokenHash)
     return ok ? user : null
   }
 }

@@ -1,35 +1,57 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { Injectable, NotFoundException } from '@nestjs/common'
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { randomUUID } from 'crypto'
 import { DataSource, Repository } from 'typeorm'
+import { ProductsClient } from '../products/products.client'
 import { Order } from './order.entity'
 import { OrderItem } from './order-item.entity'
-import { OutboxEvent } from '../outbox/outbox-event.entity'
 
 @Injectable()
 export class OrdersService {
   constructor(
     private readonly dataSource: DataSource,
-    @InjectRepository(Order) private orderRepo: Repository<Order>,
+    @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
+    private readonly products: ProductsClient,
   ) {}
-  async create(body: {
-    customerId: string
-    customerName: string
-    customerPhone: string
-    items: Array<{
-      productId: string
-      productName: string
-      unitPrice: string
-      qty: number
-    }>
-  }) {
+
+  async create(
+    userId: string,
+    userName: string,
+    userPhone: string,
+    body: {
+      items: Array<{
+        productId: string
+        productName: string
+        unitPrice: string
+        qty: number
+      }>
+    },
+  ) {
+    const orderId = randomUUID()
+
+    // reserve stock
+    const reserveRes = await this.products.reserveStock({
+      orderId,
+      items: body.items.map((i) => ({ productId: i.productId, qty: i.qty })),
+    })
+
+    if (reserveRes.status >= 400) {
+      throw new ConflictException(
+        reserveRes.data?.message || 'Reserve stock failed',
+      )
+    }
+
     return this.dataSource.transaction(async (manager) => {
       const order = manager.create(Order, {
-        customerId: body.customerId,
-        customerName: body.customerName,
-        customerPhone: body.customerPhone,
-        status: 'PENDING',
+        id: orderId,
+        customerId: userId,
+        customerName: userName,
+        customerPhone: userPhone,
+        status: 'CONFIRMED',
       })
 
       order.items = body.items.map((it) =>
@@ -38,7 +60,7 @@ export class OrdersService {
           productNameSnapshot: it.productName,
           unitPriceSnapshot: it.unitPrice,
           qty: it.qty,
-          lineTotal: (Number(it.unitPrice) * it.qty).toString(),
+          lineTotal: (Number(it.unitPrice) * it.qty).toFixed(2),
         }),
       )
 
@@ -46,30 +68,9 @@ export class OrdersService {
         (sum, item) => sum + Number(item.lineTotal),
         0,
       )
-      order.totalAmount = total.toString()
+      order.totalAmount = total.toFixed(2)
 
-      const saved = await manager.save(order)
-
-      const outbox = manager.create(OutboxEvent, {
-        aggregateType: 'ORDER',
-        aggregateId: saved.id,
-        eventType: 'OrderCreated',
-        payload: {
-          orderId: saved.id,
-          customerId: saved.customerId,
-          customerName: saved.customerName,
-          customerPhone: saved.customerPhone,
-          items: saved.items.map((i) => ({
-            productId: i.productId,
-            qty: i.qty,
-          })),
-        },
-        status: 'PENDING',
-        publishedAt: null,
-      })
-      await manager.save(outbox)
-
-      return saved
+      return manager.save(order)
     })
   }
 
@@ -82,32 +83,24 @@ export class OrdersService {
     return order
   }
 
-  async list(filter: {
-    phone?: string
-    name?: string
-    status?: 'PENDING' | 'CONFIRMED' | 'CANCELLED'
-    from?: string
-    to?: string
-    page?: number
-    limit?: number
-  }) {
+  async listByUser(
+    userId: string,
+    filter: {
+      status?: 'PENDING' | 'CONFIRMED' | 'CANCELLED'
+      page?: number
+      limit?: number
+    },
+  ) {
     const page = Math.max(1, Number(filter.page || 1))
     const limit = Math.min(100, Math.max(1, Number(filter.limit || 10)))
     const skip = (page - 1) * limit
 
-    const qb = this.orderRepo.createQueryBuilder('o')
+    const qb = this.orderRepo
+      .createQueryBuilder('o')
+      .where('o.customerId = :userId', { userId })
 
-    if (filter.phone)
-      qb.andWhere('o.customerPhone = :phone', { phone: filter.phone })
-    if (filter.name)
-      qb.andWhere('o.customerName ILIKE :name', { name: `%${filter.name}%` })
     if (filter.status)
       qb.andWhere('o.status = :status', { status: filter.status })
-
-    if (filter.from)
-      qb.andWhere('o.createdAt >= :from', { from: `${filter.from} 00:00:00` })
-    if (filter.to)
-      qb.andWhere('o.createdAt <= :to', { to: `${filter.to} 23:59:59` })
 
     qb.orderBy('o.createdAt', 'DESC').skip(skip).take(limit)
 
@@ -124,16 +117,6 @@ export class OrdersService {
     }
   }
 
-  // Saga consumer gọi
-  async markConfirmed(orderId: string) {
-    await this.orderRepo.update({ id: orderId }, { status: 'CONFIRMED' })
-  }
-
-  async markCancelled(orderId: string) {
-    await this.orderRepo.update({ id: orderId }, { status: 'CANCELLED' })
-  }
-
-  // Admin endpoints (demo/ops)
   async confirmAdmin(orderId: string) {
     const o = await this.orderRepo.findOne({ where: { id: orderId } })
     if (!o) throw new NotFoundException('Order not found')
@@ -141,8 +124,7 @@ export class OrdersService {
     return this.orderRepo.save(o)
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async cancelAdmin(orderId: string, reason?: string) {
+  async cancelAdmin(orderId: string, _reason?: string) {
     const o = await this.orderRepo.findOne({ where: { id: orderId } })
     if (!o) throw new NotFoundException('Order not found')
     o.status = 'CANCELLED'
@@ -153,14 +135,14 @@ export class OrdersService {
     const rows = await this.orderRepo.query(
       `
       SELECT
-        DATE(o.created_at) AS day,
+        DATE(o.createdAt) AS day,
         COUNT(*)::int AS orders,
-        SUM(o.total_amount::numeric)::text AS revenue
+        SUM(o.totalAmount::numeric)::text AS revenue
       FROM orders o
       WHERE o.status = 'CONFIRMED'
-        AND o.created_at >= $1::date
-        AND o.created_at <= ($2::date + INTERVAL '1 day' - INTERVAL '1 second')
-      GROUP BY DATE(o.created_at)
+        AND o.createdAt >= $1::date
+        AND o.createdAt <= ($2::date + INTERVAL '1 day' - INTERVAL '1 second')
+      GROUP BY DATE(o.createdAt)
       ORDER BY day ASC
       `,
       [from, to],

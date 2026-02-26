@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { UsersService } from '../users/users.service'
 import { User } from '../users/user.entity'
-// import process from 'process'
+import type { StringValue } from 'ms'
 
 @Injectable()
 export class AuthService {
@@ -14,7 +14,6 @@ export class AuthService {
   async register(input: { phone: string; name: string; password: string }) {
     const user = await this.users.createWithPassword(input)
     const tokens = await this.issueTokens(user)
-    await this.users.setRefreshTokenHash(user.id, tokens.refreshToken)
     return { user: this.safeUser(user), ...tokens }
   }
 
@@ -23,45 +22,47 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Invalid credentials')
 
     const tokens = await this.issueTokens(user)
-    await this.users.setRefreshTokenHash(user.id, tokens.refreshToken)
     return { user: this.safeUser(user), ...tokens }
   }
 
-  async refresh(refreshToken: string) {
-    let payload: any
-    try {
-      payload = await this.jwt.verifyAsync(refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET!,
-      })
-    } catch {
-      throw new UnauthorizedException('Invalid refresh token')
-    }
+  // async refresh(refreshToken: string) {
+  //   let payload: RefreshTokenPayload
+  //   try {
+  //     payload = await this.jwt.signAsync(refreshToken as any, {
+  //       secret: process.env.JWT_REFRESH_SECRET!,
+  //       expiresIn: (process.env.JWT_REFRESH_EXPIRES ||
+  //         '7d') as unknown as StringValue,
+  //     })
+  //   } catch {
+  //     throw new UnauthorizedException('Invalid refresh token')
+  //   }
 
-    if (payload.tokenType !== 'refresh') {
-      throw new UnauthorizedException('Invalid token type')
-    }
+  //   if (payload.tokenType !== 'refresh') {
+  //     throw new UnauthorizedException('Invalid token type')
+  //   }
 
-    const user = await this.users.validateRefreshToken(
-      payload.sub,
-      refreshToken,
-    )
-    if (!user) throw new UnauthorizedException('Invalid refresh token')
+  //   const user = await this.users.validateRefreshToken(
+  //     payload.sub,
+  //     refreshToken,
+  //   )
+  //   if (!user) throw new UnauthorizedException('Invalid refresh token')
 
-    const tokens = await this.issueTokens(user)
-    await this.users.setRefreshTokenHash(user.id, tokens.refreshToken)
-    return { user: this.safeUser(user), ...tokens }
-  }
+  //   const tokens = await this.issueTokens(user)
+  //   await this.users.setRefreshTokenHash(user.id, tokens.refreshToken)
+  //   return { user: this.safeUser(user), ...tokens }
+  // }
 
-  async logout(userId: string) {
-    await this.users.setRefreshTokenHash(userId, null)
-    return { ok: true }
-  }
+  // async logout(userId: string) {
+  //   await this.users.setRefreshTokenHash(userId, null)
+  //   return { ok: true }
+  // }
 
   private async issueTokens(user: User) {
     const accessPayload = {
       sub: user.id,
       phone: user.phone,
       name: user.name,
+      role: user.role,
       tokenType: 'access',
     }
 
@@ -70,20 +71,22 @@ export class AuthService {
       tokenType: 'refresh',
     }
 
-    const accessToken = await this.jwt.signAsync(accessPayload, {
+    const accessToken = await this.jwt.signAsync(accessPayload as any, {
       secret: process.env.JWT_ACCESS_SECRET!,
-      expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m',
+      expiresIn: (process.env.JWT_ACCESS_EXPIRES ||
+        '15m') as unknown as StringValue,
     })
 
-    const refreshToken = await this.jwt.signAsync(refreshPayload, {
+    const refreshToken = await this.jwt.signAsync(refreshPayload as any, {
       secret: process.env.JWT_REFRESH_SECRET!,
-      expiresIn: process.env.JWT_REFRESH_EXPIRES || '7d',
+      expiresIn: (process.env.JWT_REFRESH_EXPIRES ||
+        '7d') as unknown as StringValue,
     })
 
     return { accessToken, refreshToken }
   }
 
   private safeUser(user: User) {
-    return { id: user.id, phone: user.phone, name: user.name }
+    return { id: user.id, phone: user.phone, name: user.name, role: user.role }
   }
 }

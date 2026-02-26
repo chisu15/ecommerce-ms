@@ -1,13 +1,30 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm'
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm'
 
 @Entity('stocks')
+@Index(['productId'], { unique: true })
 export class Stock {
-  @PrimaryColumn({ name: 'product_id', type: 'uuid' })
+  @PrimaryGeneratedColumn('uuid')
+  id!: string
+
+  @Column({ type: 'uuid' })
   productId!: string
 
-  @Column({ name: 'qty_available', type: 'int', default: 0 })
-  qtyAvailable!: number
+  @Column({ type: 'int', default: 0 })
+  availableQty!: number
 
-  @Column({ name: 'qty_reserved', type: 'int', default: 0 })
-  qtyReserved!: number
+  @Column({ type: 'int', default: 0 })
+  reservedQty!: number
+
+  @CreateDateColumn({ name: 'createdAt' })
+  createdAt!: Date
+
+  @UpdateDateColumn({ name: 'updatedAt' })
+  updatedAt!: Date
 }

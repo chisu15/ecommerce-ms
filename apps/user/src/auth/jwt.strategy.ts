@@ -1,3 +1,4 @@
+import { AccessTokenPayload, JwtUser } from '@app/common'
 import { Injectable } from '@nestjs/common'
 import { PassportStrategy } from '@nestjs/passport'
 import { ExtractJwt, Strategy } from 'passport-jwt'
@@ -11,9 +12,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     })
   }
 
-  // payload: { sub, phone, name }
-  validate(payload: any) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    return { userId: payload.sub, phone: payload.phone, name: payload.name }
+  validate(payload: AccessTokenPayload): JwtUser {
+    return {
+      userId: payload.sub,
+      phone: payload.phone,
+      name: payload.name,
+      role: payload.role,
+      tokenType: payload.tokenType,
+    }
   }
 }

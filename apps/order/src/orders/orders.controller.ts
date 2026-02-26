@@ -2,37 +2,46 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
+  NotFoundException,
   Param,
   Patch,
   Post,
   Query,
+  UnauthorizedException,
 } from '@nestjs/common'
 import { OrdersService } from './orders.service'
-import { CreateOrderDto } from './dto/create-order.dto'
-import { ListOrdersDto } from './dto/list-orders.dto'
-import { CancelOrderDto } from './dto/cancel-order.dto'
+import { CreateOrderDto, ListOrdersDto, CancelOrderDto } from '@app/common'
 
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly orders: OrdersService) {}
 
   @Post()
-  create(@Body() body: CreateOrderDto) {
-    return this.orders.create(body)
+  create(
+    @Headers('x-user-id') userId: string,
+    @Headers('x-user-name') userName: string,
+    @Headers('x-user-phone') userPhone: string,
+    @Body() body: CreateOrderDto,
+  ) {
+    if (!userId) throw new UnauthorizedException('Missing user context')
+    return this.orders.create(userId, userName || '', userPhone || '', body)
   }
 
   @Get(':id')
-  get(@Param('id') id: string) {
-    return this.orders.get(id)
+  async get(@Param('id') id: string, @Headers('x-user-id') userId: string) {
+    const order = await this.orders.get(id)
+
+    if (order.customerId !== userId) throw new NotFoundException()
+    return order
   }
 
-  // GET /orders?phone=&name=&status=&from=&to=
   @Get()
-  list(@Query() q: ListOrdersDto) {
-    return this.orders.list(q)
+  list(@Headers('x-user-id') userId: string, @Query() q: ListOrdersDto) {
+    if (!userId) throw new UnauthorizedException('Missing user context')
+    return this.orders.listByUser(userId, q)
   }
 
-  // Admin actions (demo)
   @Patch(':id/confirm')
   confirm(@Param('id') id: string) {
     return this.orders.confirmAdmin(id)
@@ -43,7 +52,6 @@ export class OrdersController {
     return this.orders.cancelAdmin(id, body?.reason)
   }
 
-  // Report daily: /orders/report/daily?from=2026-02-01&to=2026-02-28
   @Get('report/daily')
   reportDaily(@Query('from') from: string, @Query('to') to: string) {
     return this.orders.reportDaily(from, to)

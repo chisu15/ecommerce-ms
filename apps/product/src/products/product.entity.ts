@@ -22,6 +22,6 @@ export class Product {
   @Column({ type: 'numeric' })
   price!: string
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'createdAt' })
   createdAt!: Date
 }

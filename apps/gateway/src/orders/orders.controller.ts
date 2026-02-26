@@ -1,7 +1,7 @@
 import { All, Controller, Req, Res } from '@nestjs/common'
 import type { Response } from 'express'
 import { HttpClientService } from '../proxy/http-client/http-client.service'
-import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { CurrentUser } from '../auth/auth.decorator'
 
 @Controller('orders')
 export class OrdersController {
@@ -12,6 +12,8 @@ export class OrdersController {
     if (user) {
       req.headers['x-user-id'] = user.userId
       req.headers['x-user-phone'] = user.phone
+      req.headers['x-user-name'] = user.name
+      req.headers['x-user-role'] = user.role
     }
 
     const baseUrl = process.env.ORDER_BASE_URL || 'http://localhost:3003'
@@ -29,6 +31,8 @@ export class OrdersController {
     if (user) {
       req.headers['x-user-id'] = user.userId
       req.headers['x-user-phone'] = user.phone
+      req.headers['x-user-name'] = user.name
+      req.headers['x-user-role'] = user.role
     }
 
     const baseUrl = process.env.ORDER_BASE_URL || 'http://localhost:3003'

@@ -5,37 +5,41 @@ import {
   Index,
   OneToMany,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm'
 import { OrderItem } from './order-item.entity'
 
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED'
 
 @Entity('orders')
-@Index(['customerPhone', 'createdAt'])
+@Index(['customerPhone'])
+@Index(['customerName'])
+@Index(['status', 'createdAt'])
 export class Order {
   @PrimaryGeneratedColumn('uuid')
   id!: string
 
-  @Column({ name: 'customer_id', type: 'uuid' })
+  @Column({ type: 'uuid' })
   customerId!: string
 
-  @Column({ name: 'customer_name' })
-  @Index()
+  @Column({ type: 'varchar' })
   customerName!: string
 
-  @Column({ name: 'customer_phone' })
-  @Index()
+  @Column({ type: 'varchar' })
   customerPhone!: string
 
   @Column({ type: 'varchar', default: 'PENDING' })
   status!: OrderStatus
 
-  @Column({ name: 'total_amount', type: 'numeric', default: 0 })
+  @Column({ type: 'numeric', precision: 14, scale: 2, default: 0 })
   totalAmount!: string
 
-  @CreateDateColumn({ name: 'created_at' })
+  @OneToMany(() => OrderItem, (i) => i.order, { cascade: true })
+  items!: OrderItem[]
+
+  @CreateDateColumn({ name: 'createdAt' })
   createdAt!: Date
 
-  @OneToMany(() => OrderItem, (i: OrderItem) => i.order, { cascade: true })
-  items!: OrderItem[]
+  @UpdateDateColumn({ name: 'updatedAt' })
+  updatedAt!: Date
 }

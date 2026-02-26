@@ -3,8 +3,6 @@ import { ProductController } from './product.controller'
 import { ProductService } from './product.service'
 import { ProductsModule } from './products/products.module'
 import { StockModule } from './stock/stock.module'
-import { OutboxModule } from './outbox/outbox.module'
-import { StreamsModule } from './streams/streams.module'
 import { ConfigModule } from '@nestjs/config'
 import { TypeOrmModule } from '@nestjs/typeorm'
 
@@ -26,8 +24,6 @@ import { TypeOrmModule } from '@nestjs/typeorm'
     }),
     ProductsModule,
     StockModule,
-    OutboxModule,
-    StreamsModule,
   ],
   controllers: [ProductController],
   providers: [ProductService],

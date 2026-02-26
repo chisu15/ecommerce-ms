@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { ConflictException, Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { DataSource, Repository } from 'typeorm'
 import { Stock } from './stock.entity'
@@ -8,95 +8,84 @@ import { StockReservation } from './stock-reservation.entity'
 export class StockService {
   constructor(
     private readonly dataSource: DataSource,
-    @InjectRepository(Stock) private stockRepo: Repository<Stock>,
+    @InjectRepository(Stock) private readonly stockRepo: Repository<Stock>,
     @InjectRepository(StockReservation)
-    private resRepo: Repository<StockReservation>,
+    private readonly reservationRepo: Repository<StockReservation>,
   ) {}
 
-  async getStock(productId: string) {
+  async get(productId: string) {
     return this.stockRepo.findOne({ where: { productId } })
   }
 
-  async upsertStock(productId: string, qtyAvailable: number) {
-    const existing = await this.stockRepo.findOne({ where: { productId } })
-    if (!existing) {
-      return this.stockRepo.save(
-        this.stockRepo.create({ productId, qtyAvailable, qtyReserved: 0 }),
-      )
-    }
-    existing.qtyAvailable = qtyAvailable
-    return this.stockRepo.save(existing)
-  }
-
-  async addStock(productId: string, delta: number) {
-    const s = await this.stockRepo.findOne({ where: { productId } })
-    if (!s) {
-      return this.stockRepo.save(
-        this.stockRepo.create({
+  async upsert(productId: string, availableQty: number) {
+    return this.dataSource.transaction(async (manager) => {
+      const existed = await manager.findOne(Stock, { where: { productId } })
+      if (!existed) {
+        const created = manager.create(Stock, {
           productId,
-          qtyAvailable: delta,
-          qtyReserved: 0,
-        }),
-      )
-    }
-    s.qtyAvailable += delta
-    return this.stockRepo.save(s)
-  }
+          availableQty,
+          reservedQty: 0,
+        })
+        return manager.save(created)
+      }
 
-  async deductStock(productId: string, delta: number) {
-    // admin xuất kho manual: không cho âm
-    const s = await this.stockRepo.findOne({ where: { productId } })
-    if (!s) return null
-    s.qtyAvailable = Math.max(0, s.qtyAvailable - delta)
-    return this.stockRepo.save(s)
+      existed.availableQty = availableQty
+      // giữ reservedQty nguyên
+      return manager.save(existed)
+    })
   }
 
   /**
-   * Idempotent reserve by orderId (unique in stock_reservations)
+   * Reserve stock theo orderId (idempotent).
+   * - Atomic (transaction)
+   * - Chống race (pessimistic lock)
+   * - Idempotent theo orderId (unique)
    */
   async reserve(
     orderId: string,
     items: Array<{ productId: string; qty: number }>,
   ) {
+    if (!items?.length) return { ok: true, idempotent: true }
+
     return this.dataSource.transaction(async (manager) => {
+      // idempotency
       const existed = await manager.findOne(StockReservation, {
         where: { orderId },
       })
-      if (existed) {
-        return { ok: true as const, alreadyReserved: true as const }
-      }
+      if (existed) return { ok: true, idempotent: true }
 
-      const stockMap = new Map<string, Stock>()
+      // reserve từng item, lock row để tránh race
       for (const it of items) {
-        const s = await manager.findOne(Stock, {
-          where: { productId: it.productId },
-        })
-        if (!s)
-          return { ok: false as const, reason: `NO_STOCK_${it.productId}` }
-        stockMap.set(it.productId, s)
-      }
+        const stock = await manager
+          .createQueryBuilder(Stock, 's')
+          .setLock('pessimistic_write')
+          .where('s.productId = :pid', { pid: it.productId })
+          .getOne()
 
-      for (const it of items) {
-        const s = stockMap.get(it.productId)!
-        if (s.qtyAvailable < it.qty) {
-          return { ok: false as const, reason: `INSUFFICIENT_${it.productId}` }
+        if (!stock) {
+          throw new ConflictException(`No stock for product ${it.productId}`)
         }
+
+        if (stock.availableQty < it.qty) {
+          throw new ConflictException(
+            `Insufficient stock for product ${it.productId}`,
+          )
+        }
+
+        stock.availableQty -= it.qty
+        stock.reservedQty += it.qty
+        await manager.save(stock)
       }
 
-      for (const it of items) {
-        const s = stockMap.get(it.productId)!
-        s.qtyAvailable -= it.qty
-        s.qtyReserved += it.qty
-        await manager.save(s)
-      }
+      // 3) save reservation
+      const reservation = manager.create(StockReservation, {
+        orderId,
+        items,
+        status: 'RESERVED',
+      })
+      await manager.save(reservation)
 
-      await manager.save(manager.create(StockReservation, { orderId, items }))
-
-      return { ok: true as const, alreadyReserved: false as const }
+      return { ok: true }
     })
-  }
-
-  async reservationByOrderId(orderId: string) {
-    return this.resRepo.findOne({ where: { orderId } })
   }
 }

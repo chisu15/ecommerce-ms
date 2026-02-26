@@ -21,7 +21,7 @@ export class ProductsService {
     const limit = Math.min(100, Math.max(1, Number(filter.limit || 10)))
     const skip = (page - 1) * limit
 
-    // sku = exact match (trả 1 item cũng ok, nhưng mình vẫn trả pagination đồng bộ)
+    // sku = exact match
     const qb = this.repo.createQueryBuilder('p')
 
     if (filter.sku) qb.andWhere('p.sku = :sku', { sku: filter.sku })

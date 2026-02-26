@@ -3,12 +3,12 @@ import axios, { AxiosRequestConfig } from 'axios'
 
 @Injectable()
 export class HttpClientService {
-  async forward(req: any, baseUrl: string) {
+  async forward(req, baseUrl): Promise<{ status: number; data; headers}> {
     const url = `${baseUrl}${req.originalUrl}`
 
     const headers = { ...req.headers }
-    delete (headers as any).host
-    delete (headers as any)['content-length']
+    delete (headers).host
+    delete (headers)['content-length']
 
     const config: AxiosRequestConfig = {
       url,

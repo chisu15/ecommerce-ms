@@ -9,18 +9,18 @@ export class OrderItem {
   @ManyToOne(() => Order, (o) => o.items, { onDelete: 'CASCADE' })
   order!: Order
 
-  @Column({ name: 'product_id', type: 'uuid' })
+  @Column({ type: 'uuid' })
   productId!: string
 
-  @Column({ name: 'product_name_snapshot' })
+  @Column({ type: 'varchar' })
   productNameSnapshot!: string
 
-  @Column({ name: 'unit_price_snapshot', type: 'numeric' })
+  @Column({ type: 'numeric', precision: 14, scale: 2 })
   unitPriceSnapshot!: string
 
   @Column({ type: 'int' })
   qty!: number
 
-  @Column({ name: 'line_total', type: 'numeric' })
+  @Column({ type: 'numeric', precision: 14, scale: 2 })
   lineTotal!: string
 }

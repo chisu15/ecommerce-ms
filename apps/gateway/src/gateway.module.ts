@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config'
 import { APP_GUARD } from '@nestjs/core'
 
 import { AuthModule } from './auth/auth.module'
-import { AccessTokenGuard } from './auth/guards/access-token.guard'
+
 import { ProxyModule } from './proxy/proxy.module'
 
 import { HealthController } from './health/health.controller'
@@ -28,6 +28,6 @@ import { AuthController } from './auth/auth.controller'
     OrdersController,
     UsersController,
   ],
-  providers: [{ provide: APP_GUARD, useClass: AccessTokenGuard }],
+  providers: [],
 })
 export class GatewayModule {}
