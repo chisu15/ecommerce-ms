@@ -11,6 +11,8 @@ import { ProductsController } from './products/products.controller'
 import { OrdersController } from './orders/orders.controller'
 import { UsersController } from './users/users.controller'
 import { AuthController } from './auth/auth.controller'
+import { ProductsAdminController } from './products/product-admin.controller'
+import { OrdersAdminController } from './orders/orders-admin.controller'
 
 @Module({
   imports: [
@@ -26,7 +28,9 @@ import { AuthController } from './auth/auth.controller'
     AuthController,
     ProductsController,
     OrdersController,
+    OrdersAdminController,
     UsersController,
+    ProductsAdminController,
   ],
   providers: [],
 })

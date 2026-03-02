@@ -1,16 +1,74 @@
-import { Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import { User } from './user.entity'
+import { User, UserRole } from './user.entity'
 import * as bcrypt from 'bcrypt'
+import { UpdateMeDto } from '@app/common'
 
 @Injectable()
 export class UsersService {
   constructor(@InjectRepository(User) private repo: Repository<User>) {}
 
-  create(data: { fullName: string; phone: string; email?: string }) {
-    const u = this.repo.create(data)
-    return this.repo.save(u)
+  safeUser(u: User) {
+    const { passwordHash, ...rest } = u as any
+    return rest
+  }
+  async adminCreate(dto: {
+    phone: string
+    name: string
+    password: string
+    role: UserRole
+  }) {
+    const existed = await this.repo.findOne({ where: { phone: dto.phone } })
+    if (existed) throw new BadRequestException('Phone already exists')
+      
+    const passwordHash = await bcrypt.hash(dto.password, 10)
+
+    const user = this.repo.create({
+      phone: dto.phone,
+      name: dto.name,
+      passwordHash,
+      role: dto.role ?? 'USER',
+    })
+
+    const saved = await this.repo.save(user)
+    return this.safeUser(saved)
+  }
+
+  async adminUpdate(
+    id: string,
+    dto?: {
+      phone?: string
+      name?: string
+      password?: string
+      role?: UserRole
+    },
+  ) {
+    const user = await this.findById(id)
+
+    if (!dto) return this.safeUser(user)
+
+    if (dto.phone && dto.phone !== user.phone) {
+      const existed = await this.repo.findOne({ where: { phone: dto.phone } })
+      if (existed) throw new BadRequestException('Phone already exists')
+      user.phone = dto.phone
+    }
+
+    if (dto.name) user.name = dto.name
+    if (dto.role) user.role = dto.role
+
+    if (dto.password) {
+      user.passwordHash = await bcrypt.hash(dto.password, 10)
+    }
+
+    const saved = await this.repo.save(user)
+    return this.safeUser(saved)
+  }
+
+  async adminDelete(id: string) {
+    const user = await this.findById(id)
+    await this.repo.delete({ id: user.id })
+    return { ok: true }
   }
 
   async list(filter: {
@@ -40,7 +98,9 @@ export class UsersService {
   }
 
   async findById(id: string) {
-    return this.repo.findOne({ where: { id } })
+    const user = await this.repo.findOne({ where: { id } })
+    if (!user) throw new NotFoundException('User not found')
+    return user
   }
 
   async findByPhone(phone: string) {
@@ -69,5 +129,17 @@ export class UsersService {
     if (!user) return null
     const ok = await bcrypt.compare(password, user.passwordHash)
     return ok ? user : null
+  }
+
+  async me(userId: string) {
+    const user = await this.findById(userId)
+    return this.safeUser(user)
+  }
+
+  async updateMe(userId: string, dto?: UpdateMeDto) {
+    const user = await this.findById(userId)
+    if (dto?.name) user.name = dto.name
+    const saved = await this.repo.save(user)
+    return this.safeUser(saved)
   }
 }

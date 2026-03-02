@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Query,
-  Req,
-  Res,
-} from '@nestjs/common'
+import { All, Controller, Req, Res } from '@nestjs/common'
 import type { Response } from 'express'
 import { HttpClientService } from '../proxy/http-client/http-client.service'
 import { Auth, CurrentUser } from '../auth/auth.decorator'
@@ -20,45 +11,30 @@ function attachUserHeaders(req: any, user?: any) {
   req.headers['x-user-role'] = user.role
 }
 
-@Auth()
-@Controller('orders')
-export class OrdersController {
+@Auth('ADMIN')
+@Controller('orders/admin')
+export class OrdersAdminController {
   constructor(private readonly http: HttpClientService) {}
 
-  @Post()
-  async create(
-    @Req() req: any,
-    @Res() res: Response,
-    @CurrentUser() user?: any,
-    @Body() _body?: any,
-  ) {
+  @All()
+  async root(@Req() req: any, @Res() res: Response, @CurrentUser() user?: any) {
+    console.log('[gateway] /orders/admin', req.method, req.originalUrl, user)
     attachUserHeaders(req, user)
+
     const baseUrl = process.env.ORDER_BASE_URL || 'http://localhost:3003'
     const r = await this.http.forward(req, baseUrl)
     return res.status(r.status).send(r.data)
   }
 
-  @Get()
-  async list(
+  @All('*path')
+  async proxy(
     @Req() req: any,
     @Res() res: Response,
     @CurrentUser() user?: any,
-    @Query() _q?: any,
   ) {
+    console.log('[gateway] /orders/admin/*', req.method, req.originalUrl, user)
     attachUserHeaders(req, user)
-    const baseUrl = process.env.ORDER_BASE_URL || 'http://localhost:3003'
-    const r = await this.http.forward(req, baseUrl)
-    return res.status(r.status).send(r.data)
-  }
 
-  @Get(':id')
-  async get(
-    @Req() req: any,
-    @Res() res: Response,
-    @CurrentUser() user?: any,
-    @Param('id') _id?: string,
-  ) {
-    attachUserHeaders(req, user)
     const baseUrl = process.env.ORDER_BASE_URL || 'http://localhost:3003'
     const r = await this.http.forward(req, baseUrl)
     return res.status(r.status).send(r.data)

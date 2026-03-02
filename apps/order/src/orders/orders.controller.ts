@@ -41,19 +41,17 @@ export class OrdersController {
     if (!userId) throw new UnauthorizedException('Missing user context')
     return this.orders.listByUser(userId, q)
   }
-
-  @Patch(':id/confirm')
+  @Get('admin/report')
+  report(@Query() q: ListOrdersDto) {
+    return this.orders.listAdmin(q)
+  }
+  @Patch('admin/:id/confirm')
   confirm(@Param('id') id: string) {
     return this.orders.confirmAdmin(id)
   }
 
-  @Patch(':id/cancel')
+  @Patch('admin/:id/cancel')
   cancel(@Param('id') id: string, @Body() body: CancelOrderDto) {
     return this.orders.cancelAdmin(id, body?.reason)
-  }
-
-  @Get('report/daily')
-  reportDaily(@Query('from') from: string, @Query('to') to: string) {
-    return this.orders.reportDaily(from, to)
   }
 }

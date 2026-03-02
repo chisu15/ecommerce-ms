@@ -5,15 +5,13 @@ import { ReserveStockDto } from '@app/common'
 @Controller('stock')
 export class StockController {
   constructor(private readonly stock: StockService) {}
-
-  @Post('reserve')
-  reserve(@Body() dto: ReserveStockDto) {
-    return this.stock.reserve(dto.orderId, dto.items)
-  }
-
   @Get(':productId')
   detail(@Param('productId') productId: string) {
     return this.stock.get(productId)
+  }
+  @Post('reserve')
+  reserve(@Body() dto: ReserveStockDto) {
+    return this.stock.reserve(dto.orderId, dto.items)
   }
 
   @Put('upsert')

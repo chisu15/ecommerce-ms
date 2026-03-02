@@ -8,6 +8,9 @@ export * from './products/update-product.dto'
 export * from './products/list-product.dto'
 
 export * from './users/list-user.dto'
+export * from './users/update-me.dto'
+export * from './users/admin-create-user.dto'
+export * from './users/admin-update-user.dto'
 
 export * from './orders/create-order.dto'
 export * from './orders/list-orders.dto'
